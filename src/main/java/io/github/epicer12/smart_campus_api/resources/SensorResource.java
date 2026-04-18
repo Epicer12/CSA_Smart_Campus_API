@@ -1,11 +1,8 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package io.github.epicer12.smart_campus_api.resources;
 
 import io.github.epicer12.smart_campus_api.exceptions.LinkedResourceNotFoundException;
 import io.github.epicer12.smart_campus_api.models.ErrorResponse;
+import io.github.epicer12.smart_campus_api.models.Room;
 import io.github.epicer12.smart_campus_api.models.Sensor;
 import io.github.epicer12.smart_campus_api.store.DataStore;
 import java.util.ArrayList;
@@ -13,14 +10,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 
 /**
  *
@@ -32,7 +33,7 @@ import javax.ws.rs.core.Response;
 @Consumes(MediaType.APPLICATION_JSON)
 public class SensorResource {
     @POST
-    public Response registerSensor(Sensor sensor){
+    public Response registerSensor(Sensor sensor, @Context UriInfo uriInfo){
         if (sensor.getId() == null || sensor.getId().isEmpty()) {
             ErrorResponse error = new ErrorResponse(400, "Bad Request", "Sensor ID is required");
             return Response.status(400).entity(error).build();
@@ -53,12 +54,12 @@ public class SensorResource {
         
         return Response.status(201)
                 .entity(sensor)
-                .header("Location", "/api/v1/sensors/" + sensor.getId())
+                .header("Location", uriInfo.getBaseUri() + "sensors/" + sensor.getId())
                 .build();
     }
     
     @GET
-    public Response getAllSensors(@QueryParam("type") String type) {
+    public Response getAllSensors(@QueryParam("type") String type, @Context UriInfo uriInfo) {
         List<Map<String, Object>> summaryList = new ArrayList<>();
         
         for (Sensor sensor : DataStore.sensors.values()) {
@@ -70,7 +71,7 @@ public class SensorResource {
             summary.put("id", sensor.getId());
             summary.put("type", sensor.getType());
             summary.put("status", sensor.getStatus());
-            summary.put("href", "/api/v1/sensors/" + sensor.getId());
+            summary.put("href", uriInfo.getBaseUri() + "sensors/" + sensor.getId());
             
             summaryList.add(summary);
         }
@@ -87,6 +88,17 @@ public class SensorResource {
         return new SensorReadingResource(sensorId);
     }
     
+    // The following endpoints are not explicitly required by the specification but are included
+    // to prevent the API from being a dead end. Without DELETE, sensors cannot be removed,
+    // making room deletion permanently impossible once a sensor is assigned.
+    // Without PUT, there is no way to change a sensor's status after registration.
+    
+    /**
+     * Returns full details of a specific sensor by ID.
+     * Clients reach this endpoint by following the href included in the GET /sensors list response,
+     * which is why the list only returns summary objects rather than full sensor data.
+     */
+    
     @GET
     @Path("/{sensorId}")
     public Response getSensorById(@PathParam("sensorId") String sensorId) {
@@ -99,5 +111,65 @@ public class SensorResource {
         }
 
         return Response.ok(sensor).build();
-}
+    }
+    
+    /**
+    * Removes a sensor from the system by ID.
+    * Also removes the sensor's ID from the parent room's sensorIds list
+    * and deletes all associated readings to prevent orphaned data.
+    * Returns 404 if the sensor does not exist.
+    */
+    @DELETE
+    @Path("/{sensorId}")
+    public Response deleteSensorById(@PathParam("sensorId") String sensorId) {
+        Sensor sensor = DataStore.sensors.get(sensorId);
+
+        if (sensor == null) {
+            ErrorResponse error = new ErrorResponse(404, "Not Found", "Sensor with ID " + sensorId + " was not found");
+            return Response.status(404).entity(error).build();
+        }
+
+        // Remove sensor ID from the parent room's sensorIds list
+        Room parentRoom = DataStore.rooms.get(sensor.getRoomId());
+        if (parentRoom != null) {
+            parentRoom.getSensorIds().remove(sensorId);
+        }
+
+        // Remove all readings associated with this sensor
+        DataStore.sensorReadings.remove(sensorId);
+
+        // Remove the sensor itself
+        DataStore.sensors.remove(sensorId);
+
+        return Response.status(204).build();
+    }
+    
+    /**
+    * Updates a sensor's status and currentValue.
+    * This is necessary because sensors change state over time (ACTIVE, MAINTENANCE, OFFLINE)
+    * and their values may need manual correction.
+    * Returns 404 if the sensor does not exist.
+    */
+    @PUT
+    @Path("/{sensorId}")
+    public Response updateSensor(@PathParam("sensorId") String sensorId, Sensor updatedSensor) {
+        Sensor sensor = DataStore.sensors.get(sensorId);
+
+        if (sensor == null) {
+            ErrorResponse error = new ErrorResponse(404, "Not Found", "Sensor with ID " + sensorId + " was not found");
+            return Response.status(404).entity(error).build();
+        }
+
+        if (updatedSensor.getStatus() != null) {
+            sensor.setStatus(updatedSensor.getStatus());
+        }
+
+        if (updatedSensor.getType() != null) {
+            sensor.setType(updatedSensor.getType());
+        }
+
+        sensor.setCurrentValue(updatedSensor.getCurrentValue());
+
+        return Response.ok(sensor).build();
+    }
 }

@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package io.github.epicer12.smart_campus_api.resources;
 
 import io.github.epicer12.smart_campus_api.exceptions.RoomNotEmptyException;
@@ -20,8 +16,9 @@ import java.util.List;
 import java.util.Map;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.PathParam;
-
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 
 /**
  *
@@ -33,21 +30,21 @@ import javax.ws.rs.core.Response;
 @Consumes(MediaType.APPLICATION_JSON)
 public class RoomResource {
     @GET
-    public Response getAllRooms() {
+    public Response getAllRooms(@Context UriInfo uriInfo) {
         List<Map<String, Object>> summaryList = new ArrayList<>();
         
         for (Room room : DataStore.rooms.values()) {
             Map<String, Object> roomSummary = new HashMap<>();
             roomSummary.put("id", room.getId());
             roomSummary.put("name", room.getName());
-            roomSummary.put("href", "/api/v1/rooms/" + room.getId());
+            roomSummary.put("href", uriInfo.getBaseUri() + "rooms/" + room.getId());
             summaryList.add(roomSummary);
         }
         return Response.ok(summaryList).build();
     }
     
     @POST
-    public Response createRoom(Room room) {
+    public Response createRoom(Room room, @Context UriInfo uriInfo) {
         if (room.getId() == null || room.getId().isEmpty()) {
             ErrorResponse error = new ErrorResponse(400, "Bad Request", "Room ID is required");
             return Response.status(400).entity(error).build();
@@ -62,7 +59,7 @@ public class RoomResource {
         
         return Response.status(201)
                 .entity(room)
-                .header("Location", "/api/v1/rooms/" + room.getId())
+                .header("Location", uriInfo.getBaseUri() + "rooms/" + room.getId())
                 .build();
     }
     
