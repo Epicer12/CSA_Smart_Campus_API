@@ -43,10 +43,12 @@ public class SensorReadingResource {
     public Response addReading(SensorReading reading) {
         Sensor sensor = DataStore.sensors.get(sensorId);
         
+        // Business rule: Sensors under maintenance cannot accept new readings
         if ("MAINTENANCE".equals(sensor.getStatus())) {
             throw new SensorUnavailableException("Sensor " + sensorId + " is currently in MAINTENANCE and cannot accept readings");
         }
         
+        // Auto generates the reading ID, capture the timestamp and updates parent sensor's currentValue field
         reading.setId(UUID.randomUUID().toString()); 
         reading.setTimestamp(System.currentTimeMillis());
         sensor.setCurrentValue(reading.getValue());

@@ -367,6 +367,24 @@ Future enhancements such as adding correlation IDs or measuring response time re
 
 ---
 
+## Additional Implementations
+
+The following endpoints were not required by the coursework specification but were added to prevent the API from being a dead end in practical use.
+
+__DELETE `/api/v1/sensors/{sensorId}`__
+
+Without this, once a sensor is registered it can never be removed. This also makes room deletion permanently impossible once any sensor is assigned, since the 409 check would always block it. This endpoint removes the sensor, cleans up the parent room's sensorIds list, and deletes all associated readings to prevent orphaned data.
+
+__PUT `/api/v1/sensors/{sensorId}`__
+
+Without this, there is no way to change a sensor's status after registration. If a sensor is created as ACTIVE and needs to go into MAINTENANCE, the only option would be to delete and re-register it, losing all reading history in the process. This endpoint allows updating the sensor's status, type, and currentValue.
+
+__GET `/api/v1/sensors/{sensorId}`__
+
+The list endpoint already returns an href pointing to each sensor's detail URL. Without this endpoint, that link would lead nowhere. This returns the full sensor object including current status and currentValue.
+
+---
+
 ## Video Demonstration
 
 A video demonstration has been submitted via Blackboard, covering all API endpoints, error scenarios, and server console logs showing the LoggingFilter in action.

@@ -18,6 +18,7 @@ public class LoggingFilter implements ContainerRequestFilter, ContainerResponseF
 
     private static final Logger LOGGER = Logger.getLogger(LoggingFilter.class.getName());
     
+    // Executes before the request method is called
     @Override
     public void filter(ContainerRequestContext requestContext) throws IOException {
         LOGGER.info("Incoming Request: [" 
@@ -25,6 +26,7 @@ public class LoggingFilter implements ContainerRequestFilter, ContainerResponseF
                 + requestContext.getUriInfo().getRequestUri().toString());
     }
 
+    // Executes after completing the request method (even if exceptions occured)
     @Override
     public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext) throws IOException {
         LOGGER.info("Outgoing Response: Status " + responseContext.getStatus());

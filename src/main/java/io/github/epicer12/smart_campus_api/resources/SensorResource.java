@@ -6,7 +6,7 @@ import io.github.epicer12.smart_campus_api.models.Room;
 import io.github.epicer12.smart_campus_api.models.Sensor;
 import io.github.epicer12.smart_campus_api.store.DataStore;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.ws.rs.Consumes;
@@ -34,23 +34,34 @@ import javax.ws.rs.core.UriInfo;
 public class SensorResource {
     @POST
     public Response registerSensor(Sensor sensor, @Context UriInfo uriInfo){
+        // Validate that the sensor ID is provided
         if (sensor.getId() == null || sensor.getId().isEmpty()) {
             ErrorResponse error = new ErrorResponse(400, "Bad Request", "Sensor ID is required");
             return Response.status(400).entity(error).build();
         }
         
+        // Additional validation for roomId field
+        if (sensor.getRoomId() == null || sensor.getRoomId().isEmpty()) {
+            ErrorResponse error = new ErrorResponse(400, "Bad Request", "Room ID is required");
+            return Response.status(400).entity(error).build();
+        }
+        
+        // Validation to prevent duplicate sensors
         if (DataStore.sensors.containsKey(sensor.getId())) {
             ErrorResponse error = new ErrorResponse(409, "Conflict", "Sensor with ID " + sensor.getId() + " already exists");
             return Response.status(409).entity(error).build();
         }
         
+        // Validate the room actually exists
         if (!DataStore.rooms.containsKey((sensor.getRoomId()))) {
             throw new LinkedResourceNotFoundException("Room with ID " + sensor.getRoomId() + " does not exists");
         }
         
         DataStore.sensors.put(sensor.getId(), sensor);
         
+        // Adding sensor's ID to the room's sensor list
         DataStore.rooms.get(sensor.getRoomId()).getSensorIds().add(sensor.getId()); 
+        
         
         return Response.status(201)
                 .entity(sensor)
@@ -67,7 +78,7 @@ public class SensorResource {
                 continue;
             }
             
-            Map<String, Object> summary = new HashMap<>();
+            Map<String, Object> summary = new LinkedHashMap<>();
             summary.put("id", sensor.getId());
             summary.put("type", sensor.getType());
             summary.put("status", sensor.getStatus());
@@ -81,10 +92,13 @@ public class SensorResource {
     
     @Path("/{sensorId}/readings")
     public SensorReadingResource getSensorReadingResource(@PathParam("sensorId") String sensorId) {
+        
+        // Validate parent resource exists before delegating to sub-resource
         if (!DataStore.sensors.containsKey(sensorId)) {
             throw new LinkedResourceNotFoundException("Sensor with ID " + sensorId + " does not exist");
         }
         
+        // Return new sub-resource instance with sensor context
         return new SensorReadingResource(sensorId);
     }
     

@@ -22,7 +22,7 @@ public class DiscoveryResource {
     public Response discover(@Context UriInfo uriInfo) {
         String base = uriInfo.getBaseUri().toString();
         
-        Map<String, Object> response = new LinkedHashMap<>();
+        Map<String, Object> response = new LinkedHashMap<>(); 
         
         // API version info
         response.put("version", "1.0");
