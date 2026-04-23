@@ -25,8 +25,8 @@ The Smart Campus API is a RESTful web service built using JAX-RS (Jersey) to man
 
 - **JAX-RS Implementation:** Jersey 2.40
 - **JSON Processing:** Jackson (jersey-media-json-jackson)
-- **Servlet Container:** Apache Tomcat
-- **Build Tool:** Maven 3.x
+- **Servlet Container:** Apache Tomcat 9
+- **Build Tool:** Maven 3.6
 - **Java Version:** Java 8
 
 ---
@@ -35,25 +35,38 @@ The Smart Campus API is a RESTful web service built using JAX-RS (Jersey) to man
 
 ### Prerequisites
 
-- JDK 8 or higher
+- JDK 21 or higher
 - Apache Maven 3.6+
-- Apache Tomcat 10.x
+- Apache Tomcat 9
 - Git
 
 ### Steps
 
-**1. Clone the repository**
+**Option A - NetBeans (Recommended)**
+
+1. Clone the repository or Download the zip file
+2. Open NetBeans and select File → Open Project or Import it via Zip File
+3. Navigate to the cloned repository folder and open it
+4. Right-click the project in the Projects panel → Clean and Build
+5. Right-click again → Run (or Deploy)
+6. NetBeans will automatically build and deploy to your configured Tomcat server
+
+---
+
+**Option B - Command Line**
+
+1. Clone the repository
 ```bash
 git clone https://github.com/epicer12/Smart_Campus_API.git
 cd Smart_Campus_API
 ```
 
-**2. Build the project**
+2. Build the project
 ```bash
 mvn clean install
 ```
 
-**3. Deploy to Tomcat**
+3. Deploy to Tomcat
 
 Copy `target/Smart_Campus_API-1.0-SNAPSHOT.war` to your Tomcat `webapps/` directory, then start Tomcat:
 ```bash
@@ -61,14 +74,10 @@ Copy `target/Smart_Campus_API-1.0-SNAPSHOT.war` to your Tomcat `webapps/` direct
 .\bin\startup.bat       # Windows
 ```
 
-Alternatively, open the project in NetBeans and use Run/Deploy directly.
-
-**4. Verify deployment**
+4. Verify deployment
 ```bash
 curl http://localhost:8080/Smart_Campus_API/api/v1/
 ```
-
----
 
 ## Sample cURL Commands
 
@@ -118,12 +127,14 @@ curl -X DELETE http://localhost:8080/Smart_Campus_API/api/v1/rooms/R101
 Expected: `409 Conflict` if the room still has sensors.
 
 ### 8. Post Reading to a Sensor in Maintenance
+
+First create a sensor with `MAINTENANCE` status:
 ```bash
 curl -X POST http://localhost:8080/Smart_Campus_API/api/v1/sensors \
   -H "Content-Type: application/json" \
   -d '{"id":"TEMP-M01","type":"Temperature","status":"MAINTENANCE","currentValue":0.0,"roomId":"R101"}'
 ```
-First create a sensor with the `MAINTENANCE` status 
+Then attempt to post a reading:
 ```bash
 curl -X POST http://localhost:8080/Smart_Campus_API/api/v1/sensors/TEMP-M01/readings \
   -H "Content-Type: application/json" \
@@ -135,7 +146,7 @@ Expected: `403 Forbidden`
 
 ## Data Persistence Note
 
-This API uses **in-memory storage** via `ConcurrentHashMap` as required by the coursework specification. All data is lost when the server restarts. No database is used.
+This API uses **in-memory storage** via synchronized `LinkedHashMaps` as required by the coursework specification. All data is lost when the server restarts. No database is used.
 
 ---
 
@@ -154,16 +165,16 @@ Because each request gets its own fresh resource instance, any data stored in in
 To address this, all data in this API lives in **static fields** inside the `DataStore` class:
 
 ```java
-public static Map<String, Room> rooms = new ConcurrentHashMap<>();
-public static Map<String, Sensor> sensors = new ConcurrentHashMap<>();
-public static Map<String, List<SensorReading>> sensorReadings = new ConcurrentHashMap<>();
+public static Map<String, Room> rooms = Collections.synchronizedMap(new LinkedHashMap<>());
+public static Map<String, Sensor> sensors = Collections.synchronizedMap(new LinkedHashMap<>());
+public static Map<String, List<SensorReading>> sensorReadings = Collections.synchronizedMap(new LinkedHashMap<>());
 ```
 
 Static fields belong to the class itself rather than to any instance, so they persist for the entire application lifetime regardless of how many resource instances come and go.
 
 However, this introduces a concurrency challenge. Apache Tomcat processes multiple requests simultaneously on separate threads, meaning several threads can read from and write to these shared maps at the same time. A regular `HashMap` is not thread-safe; concurrent modifications can corrupt its internal state, causing infinite loops, lost updates, or `ConcurrentModificationException` errors.
 
-`ConcurrentHashMap` solves this. It uses internal fine-grained locking so that multiple threads can read simultaneously without blocking each other, and concurrent writes to different segments of the map do not interfere. This allows the API to handle concurrent requests safely and efficiently, making it the correct choice for shared in-memory state in a multi-threaded JAX-RS environment.
+`Collections.synchronizedMap` solves this by wrapping the `LinkedHashMap` with a single mutex lock, ensuring only one thread can access the map at a time. This prevents concurrent modification errors and data corruption, making it safe for use as shared in-memory state in a multi-threaded JAX-RS environment.
 
 ---
 
@@ -175,14 +186,13 @@ However, this introduces a concurrency challenge. Apache Tomcat processes multip
 
 HATEOAS (Hypermedia as the Engine of Application State) is a REST architectural constraint where API responses include hyperlinks that guide clients to related resources and available next actions. Rather than requiring clients to memorise or hard-code URL patterns from external documentation, they discover and navigate the API dynamically by following links embedded in the responses themselves.
 
-In this API, the discovery endpoint at `GET /api/v1/` returns links to all primary collections:
+In this API, the discovery endpoint at `GET /api/v1/` returns links to all primary collections (Sample below):
 
 ```json
 {
   "links": {
     "rooms": "http://localhost:8080/Smart_Campus_API/api/v1/rooms",
     "sensors": "http://localhost:8080/Smart_Campus_API/api/v1/sensors"
-    // more...
   }
 }
 ```
@@ -229,9 +239,9 @@ This strikes the right balance. It provides enough information for common use ca
 
 Yes, the DELETE operation is idempotent in this implementation. An HTTP method is idempotent if making the same request multiple times produces the same **server-side state** as making it once. The key word is state, not response code.
 
-When `DELETE /api/v1/rooms/R101` is called for the first time, the room is found in `DataStore.rooms`, the sensor check passes, the room is removed, and `204 No Content` is returned. If the same request is sent again, `DataStore.rooms.get("LIB-301")` returns null because the room no longer exists. The null check triggers and `404 Not Found` is returned. Every subsequent call returns the same `404`.
+When `DELETE /api/v1/rooms/R101` is called for the first time, the room is found in `DataStore.rooms`, the sensor check passes, the room is removed, and `204 No Content` is returned. If the same request is sent again, `DataStore.rooms.get("R101")` returns null because the room no longer exists. The null check triggers and `404 Not Found` is returned. Every subsequent call returns the same `404`.
 
-The server state is identical after the first call and every call after it: room LIB-301 does not exist. This satisfies idempotency even though the response code changes from `204` to `404`. The desired end state, "this room does not exist", is achieved after the first call and remains unchanged by any subsequent calls.
+The server state is identical after the first call and every call after it: room R101 does not exist. This satisfies idempotency even though the response code changes from `204` to `404`. The desired end state, "this room does not exist", is achieved after the first call and remains unchanged by any subsequent calls.
 
 This behaviour matters for reliability. Networks are unreliable and clients sometimes retry requests after a timeout, not knowing whether the original reached the server. Because DELETE is idempotent here, retrying is always safe. The worst outcome is a `404` response, which simply confirms the room was already gone. A non-idempotent delete that caused side effects on repeated calls, such as decrementing a counter or triggering cascading deletes again, would be dangerous in a retry scenario.
 
@@ -250,6 +260,8 @@ If a client sends a request with `Content-Type: text/plain` or `Content-Type: ap
 The underlying mechanism is the `MessageBodyReader` system. JAX-RS uses registered readers to deserialize request bodies into Java objects. In this project, the Jackson library provides a `MessageBodyReader` for converting `application/json` to a `Sensor` instance. If the content type is something else, no suitable reader exists for that combination, and the request is rejected at the framework layer immediately.
 
 This is beneficial for multiple reasons. Clients get a clear, standard error code that tells them exactly what went wrong without any ambiguity. The resource method is protected from receiving malformed or unexpected input. It also prevents content-type confusion attacks where a malicious client might attempt to send XML with XXE payloads or other format-specific exploits to an endpoint expecting JSON. The annotation acts as a declarative contract that the framework enforces automatically.
+
+In this implementation, the `NotSupportedExceptionMapper` added in the Additional Implementations section intercepts this exception before it reaches the `GlobalExceptionMapper`, restoring the correct `415 Unsupported Media Type` response.
 
 ---
 
@@ -325,8 +337,6 @@ Stack traces also expose the **technology stack and library versions**. Frames f
 
 Exception messages reveal **business logic weaknesses**. A message like `NullPointerException: cannot invoke String.length() because roomId is null` tells an attacker that sending null values for certain fields may crash the application. This guides systematic fuzzing to discover further vulnerabilities and can facilitate denial of service by repeatedly triggering crashes.
 
-Database exceptions can expose **table names, column names, and query patterns**, directly assisting SQL injection planning by revealing the exact schema being targeted.
-
 The `GlobalExceptionMapper` addresses all of this by catching every `Throwable` and returning only a generic `500 Internal Server Error` message to the client, while the full exception details remain available in server-side logs for developers. Attackers receive no useful intelligence from the response, while the development team retains full visibility into what went wrong.
 
 ---
@@ -383,11 +393,17 @@ __GET `/api/v1/sensors/{sensorId}`__
 
 The list endpoint already returns an href pointing to each sensor's detail URL. Without this endpoint, that link would lead nowhere. This returns the full sensor object including current status and currentValue.
 
+__`NotSupportedExceptionMapper`__
+
+Jersey already throws a `NotSupportedException` internally when a client sends a request with a mismatched `Content-Type`. Without a dedicated mapper, this falls through to the `GlobalExceptionMapper` and returns a generic 500. This mapper intercepts it first and returns a proper `415 Unsupported Media Type` response with a descriptive JSON body.
+
 ---
 
 ## Video Demonstration
 
 A video demonstration has been submitted via Blackboard, covering all API endpoints, error scenarios, and server console logs showing the LoggingFilter in action.
+
+**YouTube Link:** https://youtu.be/nGS8v3N_1ac 
 
 ---
 
@@ -395,4 +411,4 @@ A video demonstration has been submitted via Blackboard, covering all API endpoi
 
 **Author:** Hasun Tisera  
 **Email:** editehasun17@gmail.com  
-**GitHub:** https://github.com/epicer12/Smart_Campus_API
+**GitHub:** https://github.com/Epicer12
