@@ -27,7 +27,7 @@ The Smart Campus API is a RESTful web service built using JAX-RS (Jersey) to man
 - **JSON Processing:** Jackson (jersey-media-json-jackson)
 - **Servlet Container:** Apache Tomcat 9
 - **Build Tool:** Maven 3.6
-- **Java Version:** Java 8
+- **Java Version:** Java 21
 
 ---
 
@@ -35,7 +35,7 @@ The Smart Campus API is a RESTful web service built using JAX-RS (Jersey) to man
 
 ### Prerequisites
 
-- JDK 21 or higher
+- JDK 21 (Recommended) or 17
 - Apache Maven 3.6+
 - Apache Tomcat 9
 - Git
