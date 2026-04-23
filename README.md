@@ -1,11 +1,11 @@
 # Smart Campus API
 
-**Author:** Hasun Tisera  
-**Student ID:** 20240397 / w2153004  
-**Module:** 5COSC022W Client-Server Architectures  
-**Academic Year:** 2025/26
-**GitHub Repository Link:** https://github.com/Epicer12/CSA_Smart_Campus_API
-**Postman Documentation:** https://documenter.getpostman.com/view/54114927/2sBXqDsiQo
+- **Author:** Hasun Tisera  
+- **Student ID:** 20240397 / w2153004  
+- **Module:** 5COSC022W Client-Server Architectures  
+- **Academic Year:** 2025/26
+- **GitHub Repository Link:** https://github.com/Epicer12/CSA_Smart_Campus_API
+- **Postman Documentation:** https://documenter.getpostman.com/view/54114927/2sBXqDsiQo
 
 ---
 
