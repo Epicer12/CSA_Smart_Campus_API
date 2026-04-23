@@ -4,6 +4,8 @@
 **Student ID:** 20240397 / w2153004  
 **Module:** 5COSC022W Client-Server Architectures  
 **Academic Year:** 2025/26
+**GitHub Repository Link:** https://github.com/Epicer12/CSA_Smart_Campus_API
+**Postman Documentation:** https://documenter.getpostman.com/view/54114927/2sBXqDsiQo
 
 ---
 
@@ -28,6 +30,23 @@ The Smart Campus API is a RESTful web service built using JAX-RS (Jersey) to man
 - **Servlet Container:** Apache Tomcat 9
 - **Build Tool:** Maven 3.6
 - **Java Version:** Java 21
+
+### API Endpoints
+
+| Method | Endpoint | Description | Success | Error |
+|--------|----------|-------------|---------|-------|
+| GET | `/api/v1/` | Discovery - returns API metadata and links | 200 | - |
+| GET | `/api/v1/rooms` | Get all rooms (summary list) | 200 | - |
+| POST | `/api/v1/rooms` | Create a new room | 201 | 400, 409 |
+| GET | `/api/v1/rooms/{roomId}` | Get room by ID | 200 | 404 |
+| DELETE | `/api/v1/rooms/{roomId}` | Delete a room | 204 | 404, 409 |
+| GET | `/api/v1/sensors` | Get all sensors (optional `?type=` filter) | 200 | - |
+| POST | `/api/v1/sensors` | Register a new sensor | 201 | 400, 409, 422 |
+| GET | `/api/v1/sensors/{sensorId}` | Get sensor by ID | 200 | 404 |
+| PUT | `/api/v1/sensors/{sensorId}` | Update sensor status and value | 200 | 404 |
+| DELETE | `/api/v1/sensors/{sensorId}` | Delete a sensor | 204 | 404 |
+| GET | `/api/v1/sensors/{sensorId}/readings` | Get all readings for a sensor | 200 | 422 |
+| POST | `/api/v1/sensors/{sensorId}/readings` | Post a new reading to a sensor | 201 | 403, 422 |
 
 ---
 
